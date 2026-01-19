@@ -1,50 +1,307 @@
-.App {
-  text-align: center;
+/* Uber-inspired styling */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f8f9fa;
 }
 
-.App-header {
-  background-color: #282c34;
-  padding: 20px;
-  color: white;
+/* Uber Black color scheme */
+.uber-black {
+  background-color: #000000 !important;
+  color: #ffffff !important;
 }
 
-.MapView {
-  position: relative;
-  width: 100%;
-  height: 600px;
+.uber-white {
+  background-color: #ffffff !important;
+  color: #000000 !important;
 }
 
-.RoutePanel {
-  background: white;
-  border-radius: 6px;
-  padding: 16px;
+.uber-gray {
+  background-color: #f8f9fa !important;
+  color: #000000 !important;
+}
+
+/* Custom header styling */
+.uber-header {
+  background: #000000;
+  border-bottom: 1px solid #e8e8e8;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.uber-logo {
+  font-family: 'Uber Move', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 700;
+  font-size: 24px;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+}
+
+.uber-subtitle {
+  font-family: 'Uber Move', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #ffffff;
+  opacity: 0.8;
+}
+
+/* Navigation styling */
+.uber-nav {
+  background: #000000;
+  border-right: 1px solid #e8e8e8;
+}
+
+.uber-nav .ant-menu {
+  background: #000000;
+  border-right: none;
+}
+
+.uber-nav .ant-menu-item {
+  color: #ffffff !important;
+  font-weight: 500;
+  padding: 16px 24px !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+
+.uber-nav .ant-menu-item:hover {
+  background: #1a1a1a !important;
+  color: #ffffff !important;
+}
+
+.uber-nav .ant-menu-item-selected {
+  background: #1a1a1a !important;
+  color: #ffffff !important;
+  border-left: 3px solid #ffffff;
+}
+
+/* Card styling */
+.uber-card {
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: all 0.2s ease;
+}
+
+.uber-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  transform: translateY(-1px);
+}
+
+/* Button styling */
+.uber-btn-primary {
+  background: #000000 !important;
+  border-color: #000000 !important;
+  color: #ffffff !important;
+  font-weight: 600;
+  border-radius: 8px;
+  height: 48px;
+  padding: 0 24px;
+  transition: all 0.2s ease;
+}
+
+.uber-btn-primary:hover {
+  background: #1a1a1a !important;
+  border-color: #1a1a1a !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.uber-btn-secondary {
+  background: #ffffff !important;
+  border-color: #000000 !important;
+  color: #000000 !important;
+  font-weight: 600;
+  border-radius: 8px;
+  height: 48px;
+  padding: 0 24px;
+  transition: all 0.2s ease;
+}
+
+.uber-btn-secondary:hover {
+  background: #f8f9fa !important;
+  transform: translateY(-1px);
+}
+
+/* Map container styling */
+.uber-map-container {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+/* Panel styling */
+.uber-panel {
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 24px;
   margin-bottom: 16px;
 }
 
-.TrafficPanel {
-  background: white;
-  border-radius: 6px;
+.uber-panel-title {
+  font-family: 'Uber Move', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  color: #000000;
+  margin-bottom: 16px;
+}
+
+/* Status indicators */
+.uber-status-active {
+  background: #00d084;
+  color: #ffffff;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.uber-status-pending {
+  background: #ff6b6b;
+  color: #ffffff;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.uber-status-default {
+  background: #e8e8e8;
+  color: #000000;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* Typography */
+.uber-heading-1 {
+  font-family: 'Uber Move', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 700;
+  font-size: 32px;
+  color: #000000;
+  line-height: 1.2;
+  margin: 0 0 16px 0;
+}
+
+.uber-heading-2 {
+  font-family: 'Uber Move', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 600;
+  font-size: 24px;
+  color: #000000;
+  line-height: 1.3;
+  margin: 0 0 12px 0;
+}
+
+.uber-heading-3 {
+  font-family: 'Uber Move', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 600;
+  font-size: 18px;
+  color: #000000;
+  line-height: 1.4;
+  margin: 0 0 8px 0;
+}
+
+.uber-body {
+  font-family: 'Uber Move', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #000000;
+  line-height: 1.5;
+}
+
+.uber-caption {
+  font-family: 'Uber Move', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 400;
+  font-size: 12px;
+  color: #6c757d;
+  line-height: 1.4;
+}
+
+/* Loading states */
+.uber-loading {
+  background: #000000;
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .uber-logo {
+    font-size: 20px;
+  }
+  
+  .uber-subtitle {
+    font-size: 12px;
+  }
+  
+  .uber-panel {
+    padding: 16px;
+  }
+}
+
+/* Animations */
+.uber-fade-in {
+  animation: uberFadeIn 0.3s ease-in-out;
+}
+
+@keyframes uberFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Map controls */
+.uber-map-controls {
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
   padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
 }
 
-.map-controls {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 1000;
-  background: white;
-  padding: 10px;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+.uber-map-legend {
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
 }
 
-.map-legend {
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  z-index: 1000;
-  background: white;
-  padding: 10px;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+/* Traffic indicators */
+.uber-traffic-light {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.uber-traffic-light-green {
+  background: #00d084;
+}
+
+.uber-traffic-light-yellow {
+  background: #ffaa00;
+}
+
+.uber-traffic-light-red {
+  background: #ff6b6b;
 }

@@ -53,47 +53,77 @@ public class TrafficCondition {
     private Double precipitation; // mm/hour
     
     @Property("temperature")
-    private Double temperature; // celsius
-    
-    @Property("confidence")
-    private Double confidence; // 0.0 to 1.0
-    
-    @Property("timestamp")
     private LocalDateTime timestamp;
+    private double reliability; // 0.0 to 1.0 (confidence in data)
     
-    @Property("expiresAt")
-    private LocalDateTime expiresAt;
-    
-    public TrafficCondition(String segmentId, Double currentSpeed, CongestionLevel congestionLevel) {
-        this.segmentId = segmentId;
-        this.currentSpeed = currentSpeed;
-        this.congestionLevel = congestionLevel;
-        this.timestamp = LocalDateTime.now();
-        this.expiresAt = LocalDateTime.now().plusMinutes(15);
-        this.confidence = 0.8;
+    /**
+     * Get the congestion level as a percentage
+     */
+    public double getCongestionPercentage() {
+        return congestionLevel * 100.0;
     }
     
-    public enum CongestionLevel {
-        FREE_FLOW(0.0, 0.2),
-        LIGHT(0.2, 0.4),
-        MODERATE(0.4, 0.6),
-        HEAVY(0.6, 0.8),
-        SEVERE(0.8, 1.0);
-        
-        private final double minRange;
-        private final double maxRange;
-        
-        CongestionLevel(double minRange, double maxRange) {
-            this.minRange = minRange;
-            this.maxRange = maxRange;
-        }
-        
-        public boolean isInRange(double value) {
-            return value >= minRange && value < maxRange;
+    /**
+     * Get the speed reduction percentage
+     */
+    public double getSpeedReductionPercentage() {
+        // Assuming free flow speed of 60 km/h
+        double freeFlowSpeed = 60.0;
+        return Math.max(0, (freeFlowSpeed - currentSpeed) / freeFlowSpeed * 100.0);
+    }
+    
+    /**
+     * Check if traffic is heavy
+     */
+    public boolean isHeavyTraffic() {
+        return congestionLevel > 0.6;
+    }
+    
+    /**
+     * Check if traffic is light
+     */
+    public boolean isLightTraffic() {
+        return congestionLevel < 0.3;
+    }
+    
+    /**
+     * Get traffic level description
+     */
+    public String getTrafficLevel() {
+        if (congestionLevel < 0.2) {
+            return "Very Light";
+        } else if (congestionLevel < 0.4) {
+            return "Light";
+        } else if (congestionLevel < 0.6) {
+            return "Moderate";
+        } else if (congestionLevel < 0.8) {
+            return "Heavy";
+        } else {
+            return "Very Heavy";
         }
     }
     
-    public enum IncidentType {
-        NONE, ACCIDENT, CONSTRUCTION, WEATHER, EVENT, ROAD_CLOSURE, VEHICLE_BREAKDOWN
+    /**
+     * Get the travel time multiplier for routing calculations
+     */
+    public double getTravelTimeMultiplier() {
+        return 1.0 + (congestionLevel * 0.5);
+    }
+    
+    /**
+     * Check if the data is recent (within last 5 minutes)
+     */
+    public boolean isRecent() {
+        return timestamp.isAfter(LocalDateTime.now().minusMinutes(5));
+    }
+    
+    /**
+     * Get the estimated delay in minutes for a 10km segment
+     */
+    public double getEstimatedDelayMinutes() {
+        double freeFlowSpeed = 60.0; // km/h
+        double freeFlowTime = (10.0 / freeFlowSpeed) * 60; // minutes
+        double currentTime = (10.0 / currentSpeed) * 60; // minutes
+        return currentTime - freeFlowTime;
     }
 }

@@ -161,123 +161,264 @@ public class EnhancedAStar {
                 return (distance / 1000.0) * 0.2; // $0.20 per km average
             case ECO_FRIENDLY:
                 // Estimate emissions based on distance
-                return distance / 1000.0; // Use distance as proxy for emissions
-            case SCENIC:
-                // Prioritize scenic value (inverse of distance on major roads)
-                return (distance / 1000.0) * 0.8; // Slightly lower penalty for distance
-            case SAFEST:
-                // Prioritize safety (use distance as base, highways get bonus)
-                return distance / 1000.0 * 0.9; // Slightly lower penalty
-            case COMFORTABLE:
-                // Prioritize comfort (use distance as proxy)
-                return distance / 1000.0;
-            default:
-                return distance / 1000.0;
-        }
+        
+        // User preference multipliers
+        double preferenceMultiplier = getPreferenceMultiplier(segment, criteria);
+        
+        // Final calculation
+        double finalTime = baseTime * trafficMultiplier * timeMultiplier * 
+                          weatherMultiplier * eventMultiplier * preferenceMultiplier;
+        
+        return finalTime;
     }
     
-    private double calculateHaversineDistance(double lat1, double lon1, double lat2, double lon2) {
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-        
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                  Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        
-        return EARTH_RADIUS * c;
+    /**
+     * Calculate heuristic (estimated cost from current to destination)
+     */
+    private double calculateHeuristic(Intersection current, Intersection destination) {
+        // Straight-line distance divided by maximum possible speed
+        double distance = calculateDistance(current, destination);
+        double maxSpeed = 120.0; // km/h - maximum reasonable speed
+        return distance / maxSpeed;
     }
     
-    private Route buildRoute(RouteNode endNode, Map<String, GraphNode> graph, 
-                           RouteOptimizationCriteria criteria) {
-        Route route = new Route(
-            UUID.randomUUID().toString(),
-            reconstructNodePath(endNode),
-            endNode.getPath()
-        );
+    /**
+     * Calculate distance between two intersections
+     */
+    private double calculateDistance(Intersection a, Intersection b) {
+        double latDiff = Math.toRadians(b.getLatitude() - a.getLatitude());
+        double lonDiff = Math.toRadians(b.getLongitude() - a.getLongitude());
         
-        // Calculate route metrics
-        calculateRouteMetrics(route, graph, criteria);
+        double lat1 = Math.toRadians(a.getLatitude());
+        double lat2 = Math.toRadians(b.getLatitude());
         
-        return route;
+        double a1 = Math.sin(latDiff/2) * Math.sin(latDiff/2) +
+                   Math.cos(lat1) * Math.cos(lat2) *
+                   Math.sin(lonDiff/2) * Math.sin(lonDiff/2);
+        double c = 2 * Math.atan2(Math.sqrt(a1), Math.sqrt(1-a1));
+        
+        return 6371 * c; // Earth's radius in kilometers
     }
     
-    private List<String> reconstructNodePath(RouteNode endNode) {
+    /**
+     * Reconstruct path from end node to start
+     */
+    private Route reconstructPath(Map<String, RouteNode> allNodes, RouteNode endNode, 
+                                RouteOptimizationCriteria criteria) {
         List<String> path = new ArrayList<>();
-        path.add(endNode.getNodeId());
+        List<RoadSegment> segments = new ArrayList<>();
+        double totalTime = 0.0;
+        double totalDistance = 0.0;
+        double totalCost = 0.0;
         
-        // This would need backtracking through parent references
-        // For now, return a simple path
-        return path;
+        RouteNode current = endNode;
+        
+        while (current != null) {
+            path.add(0, current.getNodeId());
+            
+            if (current.getParentId() != null) {
+                RoadSegment segment = getRoadSegment(current.getParentId(), current.getNodeId());
+                if (segment != null) {
+                    segments.add(0, segment);
+                    totalTime += calculateDynamicTravelTime(segment, criteria);
+                    totalDistance += segment.getLength();
+                    totalCost += calculateCost(segment, criteria);
+                }
+            }
+            
+            current = allNodes.get(current.getParentId());
+        }
+        
+        return new Route(path, segments, totalTime, totalDistance, totalCost, criteria);
     }
     
-    private void calculateRouteMetrics(Route route, Map<String, GraphNode> graph,
-                                     RouteOptimizationCriteria criteria) {
-        double totalDistance = 0.0;
-        double totalTravelTime = 0.0;
-        double totalCost = 0.0;
-        int trafficLights = 0;
-        int tollRoads = 0;
+    /**
+     * Get time-based multiplier for current conditions
+     */
+    private double getTimeMultiplier() {
+        LocalDateTime now = LocalDateTime.now();
+        int hour = now.getHour();
+        DayOfWeek day = now.getDayOfWeek();
         
-        for (String edgeId : route.getEdgeIds()) {
-            // Find edge in graph (this would need a more efficient lookup)
-            for (GraphNode node : graph.values()) {
-                for (GraphEdge edge : node.getAllOutgoingEdges()) {
-                    if (edge.getId().equals(edgeId)) {
-                        totalDistance += edge.getDistance();
-                        totalTravelTime += edge.getDynamicWeight();
-                        
-                        if (edge.getTollRoad()) {
-                            tollRoads++;
-                            totalCost += 5.0; // Average toll cost
-                        }
-                        
-                        // Estimate traffic lights (simplified)
-                        if (edge.getRoadType() == GraphEdge.RoadType.ARTERIAL ||
-                            edge.getRoadType() == GraphEdge.RoadType.COLLECTOR) {
-                            trafficLights++;
-                        }
-                        
-                        break;
-                    }
-                }
+        // Peak hours: 7-9 AM and 5-7 PM on weekdays
+        boolean isPeakHour = (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19);
+        boolean isWeekend = day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY;
+        
+        if (isPeakHour && !isWeekend) {
+            return PEAK_HOUR_MULTIPLIER;
+        } else if (isWeekend) {
+            return WEEKEND_MULTIPLIER;
+        }
+        
+        return 1.0;
+    }
+    
+    /**
+     * Get weather-based multiplier
+     */
+    private double getWeatherMultiplier() {
+        // In a real implementation, this would check current weather conditions
+        // For demo purposes, we'll return normal conditions
+        return 1.0;
+    }
+    
+    /**
+     * Get event-based multiplier for road segment
+     */
+    private double getEventMultiplier(RoadSegment segment) {
+        // In a real implementation, this would check for events affecting this segment
+        // For demo purposes, we'll return normal conditions
+        return 1.0;
+    }
+    
+    /**
+     * Get preference-based multiplier
+     */
+    private double getPreferenceMultiplier(RoadSegment segment, RouteOptimizationCriteria criteria) {
+        double multiplier = 1.0;
+        
+        // Avoid tolls if specified
+        if (criteria.isAvoidTolls() && segment.isTollRoad()) {
+            multiplier *= 2.0; // Heavy penalty for toll roads
+        }
+        
+        // Avoid highways if specified
+        if (criteria.isAvoidHighways() && segment.isHighway()) {
+            multiplier *= 1.5;
+        }
+        
+        // Avoid ferries if specified
+        if (criteria.isAvoidFerries() && segment.isFerry()) {
+            multiplier *= 3.0;
+        }
+        
+        // Apply road type preferences
+        for (String avoidType : criteria.getAvoidRoadTypes()) {
+            if (segment.getRoadType().equals(avoidType)) {
+                multiplier *= 1.8;
             }
         }
         
-        route.setTotalDistance(totalDistance);
-        route.setTotalTravelTime(totalTravelTime);
-        route.setTotalCost(totalCost);
-        route.setTrafficLights(trafficLights);
-        route.setTollRoads(tollRoads);
-        route.setAverageSpeed(totalDistance / totalTravelTime * 3.6); // km/h
-        route.setConfidenceScore(0.85); // Default confidence
-        route.setRouteType(Route.RouteType.valueOf(criteria.getPrimaryObjective().name()));
+        return multiplier;
     }
     
+    /**
+     * Calculate cost based on segment and criteria
+     */
+    private double calculateCost(RoadSegment segment, RouteOptimizationCriteria criteria) {
+        double baseCost = segment.getLength() * 0.1; // Base cost per km
+        
+        // Add toll cost if applicable
+        if (segment.isTollRoad()) {
+            baseCost += segment.getTollCost();
+        }
+        
+        // Apply preference-based adjustments
+        if (criteria.getOptimizationObjective() == RouteOptimizationCriteria.Objective.ECONOMICAL) {
+            baseCost *= 1.2; // Higher cost factor for economical routes
+        }
+        
+        return baseCost;
+    }
+    
+    /**
+     * Helper methods for road segment operations
+     */
+    private List<RoadSegment> getConnectedRoads(String intersectionId) {
+        List<RoadSegment> connected = new ArrayList<>();
+        
+        for (RoadSegment segment : roadSegments.values()) {
+            if (segment.getStartIntersectionId().equals(intersectionId) || 
+                segment.getEndIntersectionId().equals(intersectionId)) {
+                connected.add(segment);
+            }
+        }
+        
+        return connected;
+    }
+    
+    private String getOtherEnd(RoadSegment segment, String currentId) {
+        if (segment.getStartIntersectionId().equals(currentId)) {
+            return segment.getEndIntersectionId();
+        } else {
+            return segment.getStartIntersectionId();
+        }
+    }
+    
+    private RoadSegment getRoadSegment(String startId, String endId) {
+        for (RoadSegment segment : roadSegments.values()) {
+            if ((segment.getStartIntersectionId().equals(startId) && segment.getEndIntersectionId().equals(endId)) ||
+                (segment.getStartIntersectionId().equals(endId) && segment.getEndIntersectionId().equals(startId))) {
+                return segment;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * Cache management methods
+     */
+    private String generateCacheKey(String startId, String endId, RouteOptimizationCriteria criteria) {
+        return startId + "-" + endId + "-" + criteria.hashCode();
+    }
+    
+    private boolean isRouteExpired(Route route) {
+        // Routes expire after 5 minutes
+        return System.currentTimeMillis() - route.getCalculatedAt() > 300000;
+    }
+    
+    /**
+     * Initialize test data for demonstration
+     */
+    private void initializeTestData() {
+        // Create test intersections
+        intersections.put("A", new Intersection("A", 40.7128, -74.0060));
+        intersections.put("B", new Intersection("B", 40.7260, -73.9897));
+        intersections.put("C", new Intersection("C", 40.7489, -73.9680));
+        intersections.put("D", new Intersection("D", 40.7614, -73.9776));
+        intersections.put("E", new Intersection("E", 40.7831, -73.9712));
+        
+        // Create test road segments
+        roadSegments.put("A-B", new RoadSegment("A-B", "A", "B", 2.5, 50.0, false, false, false, "street", 0.0));
+        roadSegments.put("B-C", new RoadSegment("B-C", "B", "C", 3.2, 60.0, true, false, false, "highway", 2.50));
+        roadSegments.put("C-D", new RoadSegment("C-D", "C", "D", 1.8, 45.0, false, false, false, "street", 0.0));
+        roadSegments.put("D-E", new RoadSegment("D-E", "D", "E", 2.1, 55.0, true, false, false, "highway", 1.75));
+        roadSegments.put("A-C", new RoadSegment("A-C", "A", "C", 4.5, 40.0, false, false, false, "street", 0.0));
+        roadSegments.put("B-D", new RoadSegment("B-D", "B", "D", 3.8, 45.0, false, false, false, "street", 0.0));
+        
+        // Create test traffic conditions
+        trafficConditions.put("A-B", new TrafficCondition("A-B", 0.2, 45.0, LocalDateTime.now()));
+        trafficConditions.put("B-C", new TrafficCondition("B-C", 0.6, 35.0, LocalDateTime.now()));
+        trafficConditions.put("C-D", new TrafficCondition("C-D", 0.3, 40.0, LocalDateTime.now()));
+        trafficConditions.put("D-E", new TrafficCondition("D-E", 0.4, 42.0, LocalDateTime.now()));
+    }
+    
+    /**
+     * Inner class representing a node in the A* search
+     */
     private static class RouteNode {
         private final String nodeId;
-        private final String parentId;
-        private final double gCost; // Cost from start
-        private final double hCost; // Heuristic cost to goal
-        private final List<String> path; // Edge IDs
+        private double gScore; // Cost from start
+        private double hScore; // Heuristic cost to end
+        private String parentId;
         
-        public RouteNode(String nodeId, String parentId, double gCost, double hCost, List<String> path) {
+        public RouteNode(String nodeId, double gScore, double hScore, String parentId) {
             this.nodeId = nodeId;
+            this.gScore = gScore;
+            this.hScore = hScore;
             this.parentId = parentId;
-            this.gCost = gCost;
-            this.hCost = hCost;
-            this.path = path;
         }
         
-        public double getFCost() {
-            return gCost + hCost;
+        public double getFScore() {
+            return gScore + hScore;
         }
         
+        // Getters and setters
         public String getNodeId() { return nodeId; }
+        public double getGScore() { return gScore; }
+        public void setGScore(double gScore) { this.gScore = gScore; }
+        public double getHScore() { return hScore; }
         public String getParentId() { return parentId; }
-        public double getGCost() { return gCost; }
-        public double getHCost() { return hCost; }
-        public List<String> getPath() { return path; }
+        public void setParentId(String parentId) { this.parentId = parentId; }
     }
 }
