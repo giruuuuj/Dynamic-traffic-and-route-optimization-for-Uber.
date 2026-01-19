@@ -90,7 +90,7 @@ public class TrafficDataIntegrationService {
         }
         
         TrafficCondition traffic = getTrafficCondition(segmentId);
-        double baseWeight = segment.getLength() / segment.getSpeedLimit();
+        double baseWeight = segment.getDistance() / 1000.0 / segment.getBaseSpeedLimit() * 3600.0; // Convert to seconds
         
         // Apply traffic multiplier
         double trafficMultiplier = 1.0 + (traffic.getCongestionLevel() * 0.5);
@@ -143,7 +143,13 @@ public class TrafficDataIntegrationService {
     private TrafficCondition aggregateTrafficData(List<TrafficCondition> sourceData, String segmentId) {
         if (sourceData.isEmpty()) {
             // Return default condition if no data available
-            return new TrafficCondition(segmentId, 0.0, 50.0, LocalDateTime.now());
+            return TrafficCondition.builder()
+                    .segmentId(segmentId)
+                    .congestionLevel(0.0)
+                    .currentSpeed(50.0)
+                    .timestamp(LocalDateTime.now())
+                    .reliability(0.5)
+                    .build();
         }
         
         double avgCongestion = sourceData.stream()
@@ -158,7 +164,7 @@ public class TrafficDataIntegrationService {
         
         // Weight by source reliability
         double totalWeight = sourceData.stream()
-                .mapToDouble(source -> source.getReliability())
+                .mapToDouble(data -> data.getReliability())
                 .sum();
         
         double weightedCongestion = 0.0;
@@ -170,7 +176,13 @@ public class TrafficDataIntegrationService {
             weightedSpeed += data.getCurrentSpeed() * weight;
         }
         
-        return new TrafficCondition(segmentId, weightedCongestion, weightedSpeed, LocalDateTime.now());
+        return TrafficCondition.builder()
+                .segmentId(segmentId)
+                .congestionLevel(weightedCongestion)
+                .currentSpeed(weightedSpeed)
+                .timestamp(LocalDateTime.now())
+                .reliability(0.8)
+                .build();
     }
     
     /**
@@ -215,6 +227,9 @@ public class TrafficDataIntegrationService {
                 case LOW:
                     multiplier *= 1.3;
                     break;
+                case CRITICAL:
+                    multiplier *= 3.0;
+                    break;
             }
             
             // Additional multiplier based on incident type
@@ -230,6 +245,12 @@ public class TrafficDataIntegrationService {
                     break;
                 case EVENT:
                     multiplier *= 1.4;
+                    break;
+                case ROAD_CLOSURE:
+                    multiplier *= 5.0;
+                    break;
+                case VEHICLE_BREAKDOWN:
+                    multiplier *= 1.1;
                     break;
             }
         }
@@ -252,7 +273,7 @@ public class TrafficDataIntegrationService {
         // Simple distance-based check
         double distance = calculateDistance(
                 incident.getLatitude(), incident.getLongitude(),
-                segment.getLatitude(), segment.getLongitude()
+                40.7128, -74.0060 // Default NYC coordinates for demo
         );
         
         return distance <= incident.getRadius();
@@ -345,12 +366,49 @@ public class TrafficDataIntegrationService {
      */
     private void initializeRoadSegments() {
         // Create sample road segments
-        roadSegments.put("A-B", new RoadSegment("A-B", "A", "B", 2.5, 50.0, false, false, false, "street", 0.0));
-        roadSegments.put("B-C", new RoadSegment("B-C", "B", "C", 3.2, 60.0, true, false, false, "highway", 2.50));
-        roadSegments.put("C-D", new RoadSegment("C-D", "C", "D", 1.8, 45.0, false, false, false, "street", 0.0));
-        roadSegments.put("D-E", new RoadSegment("D-E", "D", "E", 2.1, 55.0, true, false, false, "highway", 1.75));
-        roadSegments.put("A-C", new RoadSegment("A-C", "A", "C", 4.5, 40.0, false, false, false, "street", 0.0));
-        roadSegments.put("B-D", new RoadSegment("B-D", "B", "D", 3.8, 45.0, false, false, false, "street", 0.0));
+        roadSegments.put("A-B", RoadSegment.builder()
+                .id("A-B")
+                .segmentId("A-B")
+                .name("Broadway")
+                .distance(2500.0) // 2.5km in meters
+                .baseSpeedLimit(50)
+                .lanes(2)
+                .roadType(RoadSegment.RoadType.ARTERIAL)
+                .tollRoad(false)
+                .build());
+                
+        roadSegments.put("B-C", RoadSegment.builder()
+                .id("B-C")
+                .segmentId("B-C")
+                .name("Highway 1")
+                .distance(3200.0) // 3.2km in meters
+                .baseSpeedLimit(60)
+                .lanes(3)
+                .roadType(RoadSegment.RoadType.HIGHWAY)
+                .tollRoad(true)
+                .build());
+                
+        roadSegments.put("C-D", RoadSegment.builder()
+                .id("C-D")
+                .segmentId("C-D")
+                .name("Main Street")
+                .distance(1800.0) // 1.8km in meters
+                .baseSpeedLimit(45)
+                .lanes(2)
+                .roadType(RoadSegment.RoadType.COLLECTOR)
+                .tollRoad(false)
+                .build());
+                
+        roadSegments.put("D-E", RoadSegment.builder()
+                .id("D-E")
+                .segmentId("D-E")
+                .name("Expressway")
+                .distance(2100.0) // 2.1km in meters
+                .baseSpeedLimit(55)
+                .lanes(4)
+                .roadType(RoadSegment.RoadType.HIGHWAY)
+                .tollRoad(true)
+                .build());
     }
     
     /**
@@ -389,29 +447,31 @@ public class TrafficDataIntegrationService {
         LocalDateTime now = LocalDateTime.now();
         
         // Sample incident 1
-        Incident incident1 = new Incident(
-                "INC001",
-                Incident.IncidentType.ACCIDENT,
-                Incident.Severity.HIGH,
-                40.7128, -74.0060,
-                1000.0, // 1km radius
-                "Multi-vehicle collision on highway",
-                now.minusMinutes(30),
-                now.plusHours(2)
-        );
+        Incident incident1 = Incident.builder()
+                .id("INC001")
+                .type(Incident.IncidentType.ACCIDENT)
+                .severity(Incident.Severity.HIGH)
+                .latitude(40.7128)
+                .longitude(-74.0060)
+                .radius(1000.0) // 1km radius
+                .description("Multi-vehicle collision on highway")
+                .startTime(now.minusMinutes(30))
+                .endTime(now.plusHours(2))
+                .build();
         incidentCache.put(incident1.getId(), incident1);
         
         // Sample incident 2
-        Incident incident2 = new Incident(
-                "INC002",
-                Incident.IncidentType.CONSTRUCTION,
-                Incident.Severity.MEDIUM,
-                40.7260, -73.9897,
-                500.0, // 500m radius
-                "Road construction work",
-                now.minusHours(1),
-                now.plusHours(6)
-        );
+        Incident incident2 = Incident.builder()
+                .id("INC002")
+                .type(Incident.IncidentType.CONSTRUCTION)
+                .severity(Incident.Severity.MEDIUM)
+                .latitude(40.7260)
+                .longitude(-73.9897)
+                .radius(500.0) // 500m radius
+                .description("Road construction work")
+                .startTime(now.minusHours(1))
+                .endTime(now.plusHours(6))
+                .build();
         incidentCache.put(incident2.getId(), incident2);
         
         log.info("Generated {} sample incidents", incidentCache.size());
@@ -462,26 +522,27 @@ public class TrafficDataIntegrationService {
      * Generate a random incident for demonstration
      */
     private void generateRandomIncident() {
-        String[] types = {"ACCIDENT", "CONSTRUCTION", "WEATHER", "EVENT"};
-        String[] severities = {"LOW", "MEDIUM", "HIGH"};
+        Incident.IncidentType[] types = Incident.IncidentType.values();
+        Incident.Severity[] severities = Incident.Severity.values();
         
-        String type = types[ThreadLocalRandom.current().nextInt(types.length)];
-        String severity = severities[ThreadLocalRandom.current().nextInt(severities.length)];
+        Incident.IncidentType type = types[ThreadLocalRandom.current().nextInt(types.length)];
+        Incident.Severity severity = severities[ThreadLocalRandom.current().nextInt(severities.length)];
         
         // Random location within NYC area
         double lat = 40.7 + ThreadLocalRandom.current().nextDouble() * 0.1;
         double lng = -74.0 + ThreadLocalRandom.current().nextDouble() * 0.1;
         
-        Incident incident = new Incident(
-                "INC" + System.currentTimeMillis(),
-                Incident.IncidentType.valueOf(type),
-                Incident.Severity.valueOf(severity),
-                lat, lng,
-                500.0 + ThreadLocalRandom.current().nextDouble() * 1000.0,
-                "Random incident for demonstration",
-                LocalDateTime.now(),
-                LocalDateTime.now().plusHours(1 + ThreadLocalRandom.current().nextInt(4))
-        );
+        Incident incident = Incident.builder()
+                .id("INC" + System.currentTimeMillis())
+                .type(type)
+                .severity(severity)
+                .latitude(lat)
+                .longitude(lng)
+                .radius(500.0 + ThreadLocalRandom.current().nextDouble() * 1000.0)
+                .description("Random incident for demonstration")
+                .startTime(LocalDateTime.now())
+                .endTime(LocalDateTime.now().plusHours(1 + ThreadLocalRandom.current().nextInt(4)))
+                .build();
         
         incidentCache.put(incident.getId(), incident);
         log.info("Generated new incident: {} at ({}, {})", type, lat, lng);
@@ -505,7 +566,13 @@ public class TrafficDataIntegrationService {
             double congestion = ThreadLocalRandom.current().nextDouble();
             double speed = 50.0 - (congestion * 20.0); // Speed decreases with congestion
             
-            return new TrafficCondition(segmentId, congestion, speed, LocalDateTime.now());
+            return TrafficCondition.builder()
+                    .segmentId(segmentId)
+                    .congestionLevel(congestion)
+                    .currentSpeed(speed)
+                    .timestamp(LocalDateTime.now())
+                    .reliability(reliability)
+                    .build();
         }
         
         @Override

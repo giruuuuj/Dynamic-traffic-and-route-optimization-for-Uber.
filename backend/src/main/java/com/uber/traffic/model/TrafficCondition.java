@@ -4,10 +4,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import org.springframework.data.neo4j.core.schema.Node;
-import org.springframework.data.neo4j.core.schema.GeneratedValue;
-import org.springframework.data.neo4j.core.schema.Id;
-import org.springframework.data.neo4j.core.schema.Property;
 
 import java.time.LocalDateTime;
 
@@ -15,46 +11,21 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Node("TrafficCondition")
 public class TrafficCondition {
     
-    @Id
-    @GeneratedValue
-    private Long id;
-    
-    @Property("segmentId")
     private String segmentId;
-    
-    @Property("currentSpeed")
-    private Double currentSpeed; // km/h
-    
-    @Property("congestionLevel")
-    private CongestionLevel congestionLevel;
-    
-    @Property("trafficDensity")
-    private Double trafficDensity; // vehicles per km
-    
-    @Property("flowRate")
-    private Double flowRate; // vehicles per hour
-    
-    @Property("incidentType")
-    private IncidentType incidentType;
-    
-    @Property("incidentDescription")
-    private String incidentDescription;
-    
-    @Property("weatherImpact")
-    private Double weatherImpact; // 0.0 to 1.0
-    
-    @Property("visibility")
-    private Double visibility; // in meters
-    
-    @Property("precipitation")
-    private Double precipitation; // mm/hour
-    
-    @Property("temperature")
+    private double congestionLevel; // 0.0 to 1.0 (0% to 100% congestion)
+    private double currentSpeed; // Current average speed in km/h
     private LocalDateTime timestamp;
     private double reliability; // 0.0 to 1.0 (confidence in data)
+    private double trafficDensity; // vehicles per km
+    private double flowRate; // vehicles per hour
+    private String incidentType;
+    private String incidentDescription;
+    private double weatherImpact; // 0.0 to 1.0
+    private double visibility; // in meters
+    private double precipitation; // mm/hour
+    private double temperature; // in celsius
     
     /**
      * Get the congestion level as a percentage
